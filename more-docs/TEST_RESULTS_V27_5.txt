@@ -1,0 +1,33 @@
+PASS synthetic DEX shim method is source-visible in shadow ABI
+PASS synthetic DEX constructor is source-visible in shadow ABI
+PASS shadow facade strips ACC_SYNTHETIC/ACC_BRIDGE implementation flags
+PASS broken non-app JADX source is bypassed by APK ABI shadow
+PASS DEX generic Signature supports typed enhanced-for
+PASS DEX ConstantValue remains a javac constant
+PASS JADX method/field aliases are exported on binary-owned class
+PASS InnerClasses metadata resolves JADX-renamed nested class
+PASS javac internals attribute app source against shadow ABI symbols
+PASS structured JCDiagnostic exposes found/required javac Type objects
+PASS javac Types computes castability/convertibility instead of regex guessing
+PASS missing provider source can be resurrected from import alias + smali
+PASS generalized JADX class alias maps AbstractComponentCallbacksC####x -> raw x
+PASS JADX mo####x override aliases map to raw method names
+PASS member aliases remain owner-scoped; no global suffix fan-out
+PASS caller-only owner-scoped aliases rebuild a missing provider ABI
+PASS iterative javac linker resolves chained aliases across shadow regeneration rounds
+PASS exact JADX JOBF class/package/member mappings override alias heuristics
+PASS javac argument attribution selects one exact overloaded DEX descriptor for an alias
+PASS rejected shadow candidate cannot overwrite last known-good live checkpoint
+PASS validated shadow candidate is atomically promoted with ownership/source-list checkpoint
+PASS observed top-level JADX flattening overrides nested JOBF mapping only with source evidence
+PASS intentional source-only shell receives explicit S provenance
+PASS merged-manifest AndroidX components do not become app-owned source roots
+PASS rerun repairs an already-malformed marked hybrid Gradle block before Gradle parses it
+PASS JADX SSA ArrayList/List/List/? -> javac Types.lub = List
+PASS unknown SSA version is non-vetoing when no contradictory source constraint exists
+PASS over-specific SSA declaration is widened only after receiver-member validation
+PASS source-use constraint vetoes LUB when required member exists only on concrete subtype
+PASS simple interface <clinit> is translated to legal field initializers, not deleted
+PASS complex interface <clinit> is preserved for binary-shadow/later structured repair
+PASS nested JOBF aliases preserve outer identity and cannot flatten/collide
+PASS hybrid ownership is enforced again on final JavaCompile.source

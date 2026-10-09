@@ -1,0 +1,28 @@
+[*] v28.8: using standalone dexlib2 from /tmp/v28.5-dexlib-xcolh1r4/smali-dexlib2-3.0.10.jar (com.android.tools.smali.dexlib2)
+PASS Apktool shading is not accepted as a dexlib distribution
+PASS runtime helper directly imports official com.android.tools.smali dexlib2
+PASS reflection/org.jf compatibility shim is gone
+PASS early hybrid/source engine excludes DexHybridRebuilder
+PASS call-site/encoded-value/annotation runtime references are covered
+PASS Java alias regex remains correctly escaped
+PASS --rebuild-apk source boundary remains fail-closed
+PASS DexHybridRebuilder runtime classpath includes engine + complete dexlib bundle
+PASS inventory uses the canonical runtime helper launcher
+PASS probe/inventory/merge cannot independently drop dexlib from -cp
+PASS original DEX constructor-bypass patterns are discovered from executable code
+PASS bridge rules require direct-super ownership and absent allocated-class ctor
+PASS D8 invoke-direct and invoke-direct/range references are lowered before linkage validation
+PASS v28.7 reports constructor bridge rewrites
+PASS v28.8 merge has timestamped numbered phases and failure phase reporting
+PASS v28.8 logs DEX ownership/rewrite/hash/universe transitions
+PASS v28.8 expands missing member failures with final ABI hierarchy context
+PASS v28.8 persistent dex-merge.log capture remains enabled
+PASS runtime plan excludes R.java and preserves binary-only classes
+PASS compiled replacement set includes owner companions but excludes scaffolding/unowned classes
+PASS compiled R constants are gated against the original resource-ID universe
+PASS APK repack preserves manifest/resources/assets/native payload and drops obsolete signatures
+[*] v28.8: using standalone dexlib2 from /tmp/apk2project-v28-vnyd5s6g/smali-dexlib2-3.0.10.jar (com.android.tools.smali.dexlib2)
+PASS complete dexlib API gate rejects partial Apktool shading
+PASS bytecode dealiaser rewrites app definitions and binary references to raw DEX ABI
+PASS invokedynamic lambda SAM name is dealiased with its functional-interface ABI
+PASS replacement ABI gate makes missing non-private members fatal and private omissions visible

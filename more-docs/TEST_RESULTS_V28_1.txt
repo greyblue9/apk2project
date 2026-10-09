@@ -1,0 +1,29 @@
+===== tests/v28_hybrid_apk.py =====
+PASS runtime plan excludes R.java and preserves binary-only classes
+PASS compiled replacement set includes owner companions but excludes scaffolding/unowned classes
+PASS compiled R constants are gated against the original resource-ID universe
+PASS APK repack preserves manifest/resources/assets/native payload and drops obsolete signatures
+PASS apktool jar dexlib2 autodetection
+PASS bytecode dealiaser rewrites app definitions and binary references to raw DEX ABI
+PASS invokedynamic lambda SAM name is dealiased with its functional-interface ABI
+PASS replacement ABI gate makes missing non-private members fatal and private omissions visible
+===== tests/v27_5_synthetic_visibility.py =====
+PASS synthetic DEX shim method is source-visible in shadow ABI
+PASS synthetic DEX constructor is source-visible in shadow ABI
+PASS shadow facade strips ACC_SYNTHETIC/ACC_BRIDGE implementation flags
+===== tests/v27_4_1_gradle_escape.py =====
+PASS rerun repairs an already-malformed marked hybrid Gradle block before Gradle parses it
+===== tests/v27_4_realapk_boundary.py =====
+PASS observed top-level JADX flattening overrides nested JOBF mapping only with source evidence
+PASS intentional source-only shell receives explicit S provenance
+PASS merged-manifest AndroidX components do not become app-owned source roots
+===== tests/v27_3_library_boundary.py =====
+PASS nested JOBF aliases preserve outer identity and cannot flatten/collide
+PASS hybrid ownership is enforced again on final JavaCompile.source
+===== tests/v27_2_ssa_clinit.py =====
+PASS JADX SSA ArrayList/List/List/? -> javac Types.lub = List
+PASS unknown SSA version is non-vetoing when no contradictory source constraint exists
+PASS over-specific SSA declaration is widened only after receiver-member validation
+PASS source-use constraint vetoes LUB when required member exists only on concrete subtype
+PASS simple interface <clinit> is translated to legal field initializers, not deleted
+PASS complex interface <clinit> is preserved for binary-shadow/later structured repair

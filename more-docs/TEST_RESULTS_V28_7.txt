@@ -1,0 +1,31 @@
+v28.7 focused regressions run in this environment
+
+PASS tests/v28_5_direct_dexlib_boundary.py
+  - standalone dexlib surface accepted / Apktool partial shading rejected
+  - direct com.android.tools.smali API boundary retained
+  - source compiler remains isolated from runtime dexlib
+
+PASS tests/v28_6_runtime_classpath.py
+  - canonical engine + complete dexlib runtime classpath retained for probe/inventory/merge
+
+PASS tests/v28_7_dex_constructor_bridges.py
+  - original-Dex constructor bypass discovery present
+  - bridge requires direct-super target + missing constructor on allocated class
+  - invoke-direct and invoke-direct/range lowering present
+  - merge report exposes constructor bridge counts/rules
+
+PASS tests/v28_hybrid_apk.py
+  - runtime replacement planner/scaffolding behavior
+  - R constant gate
+  - resource-preserving repack
+  - direct dexlib API gate
+  - classfile dealiasing + invokedynamic SAM mapping
+  - replacement ABI compatibility gate
+
+PASS tests/v27_5_synthetic_visibility.py
+  - synthetic DEX members remain source-visible in compile ABI
+  - ACC_SYNTHETIC / ACC_BRIDGE stripping retained
+
+Note: the entire historical suite was not rerun to completion in this sandbox because the
+long aggregate run exceeded the execution window. The focused runtime/hybrid regressions
+above all completed successfully.

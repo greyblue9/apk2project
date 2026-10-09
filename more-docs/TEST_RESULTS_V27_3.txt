@@ -1,0 +1,11 @@
+PASS nested JOBF aliases preserve outer identity and cannot flatten/collide
+PASS hybrid ownership is enforced again on final JavaCompile.source
+PASS TopActivity APK+JOBF direct-DEX probe: 1536 mapped, 0 collisions, 0 missing raw members, 0 hierarchy/kind/signature/throws/alias failures
+PASS existing hybrid shadow/linker cases
+PASS transactional shadow promotion/rejection cases
+PASS obfuscated binary ownership
+PASS semantic repair regression cases
+PASS resume safety and 3->1000 rollback
+PASS 33->100 rollback/bisection strategy
+PASS v24 DEX/smali frontier-oracle cases
+PASS v27.2 SSA LUB and interface <clinit> normalization cases

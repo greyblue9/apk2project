@@ -1,0 +1,35 @@
+===== tests/v28_hybrid_apk.py =====
+PASS runtime plan excludes R.java and preserves binary-only classes
+PASS compiled replacement set includes owner companions but excludes scaffolding/unowned classes
+PASS APK repack preserves manifest/resources/assets/native payload and drops obsolete signatures
+PASS apktool jar dexlib2 autodetection
+PASS bytecode dealiaser rewrites app definitions and binary references to raw DEX ABI
+===== tests/v27_5_synthetic_visibility.py =====
+PASS synthetic DEX shim method is source-visible in shadow ABI
+PASS synthetic DEX constructor is source-visible in shadow ABI
+PASS shadow facade strips ACC_SYNTHETIC/ACC_BRIDGE implementation flags
+===== tests/v27_4_1_gradle_escape.py =====
+PASS rerun repairs an already-malformed marked hybrid Gradle block before Gradle parses it
+===== tests/v27_4_realapk_boundary.py =====
+PASS observed top-level JADX flattening overrides nested JOBF mapping only with source evidence
+PASS intentional source-only shell receives explicit S provenance
+PASS merged-manifest AndroidX components do not become app-owned source roots
+===== tests/v27_3_library_boundary.py =====
+PASS nested JOBF aliases preserve outer identity and cannot flatten/collide
+PASS hybrid ownership is enforced again on final JavaCompile.source
+===== tests/v27_2_ssa_clinit.py =====
+PASS JADX SSA ArrayList/List/List/? -> javac Types.lub = List
+PASS unknown SSA version is non-vetoing when no contradictory source constraint exists
+PASS over-specific SSA declaration is widened only after receiver-member validation
+PASS source-use constraint vetoes LUB when required member exists only on concrete subtype
+PASS simple interface <clinit> is translated to legal field initializers, not deleted
+PASS complex interface <clinit> is preserved for binary-shadow/later structured repair
+===== tests/hybrid_transactional_shadow.py =====
+[*] Hybrid source/binary boundary: validated APK ABI shadow promoted -> apk2project-apk-shadow-abi.jar
+PASS rejected shadow candidate cannot overwrite last known-good live checkpoint
+PASS validated shadow candidate is atomically promoted with ownership/source-list checkpoint
+===== tests/obfuscated_binary_ownership.py =====
+[*] Hybrid binary-source quarantine: moved 2 file(s) out of app/src/main/java -> /tmp/v261-obf-lmgz0cfa/analysis/hybrid-binary-source-archive/java
+PASS obfuscated ownership preset overrides app package and moves binary source out of active Java tree
+===== tests/hybrid_gradle_classpath_case.py =====
+PASS hybrid shadow classpath injection tolerates AGP null classpath during configuration

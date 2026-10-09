@@ -1,0 +1,56 @@
+apk2project v27.2 test results
+
+PASS JADX SSA ArrayList/List/List/? -> javac Types.lub = List
+PASS unknown SSA version is non-vetoing when no contradictory source constraint exists
+PASS over-specific SSA declaration is widened only after receiver-member validation
+PASS source-use constraint vetoes LUB when required member exists only on concrete subtype
+PASS simple interface <clinit> is translated to legal field initializers, not deleted
+PASS complex interface <clinit> is preserved for binary-shadow/later structured repair
+
+PASS broken non-app JADX source is bypassed by APK ABI shadow
+PASS DEX generic Signature supports typed enhanced-for
+PASS DEX ConstantValue remains a javac constant
+PASS JADX method/field aliases are exported on binary-owned class
+PASS InnerClasses metadata resolves JADX-renamed nested class
+PASS javac internals attribute app source against shadow ABI symbols
+PASS structured JCDiagnostic exposes found/required javac Type objects
+PASS javac Types computes castability/convertibility instead of regex guessing
+PASS missing provider source can be resurrected from import alias + smali
+PASS generalized JADX class alias maps AbstractComponentCallbacksC####x -> raw x
+PASS JADX mo####x override aliases map to raw method names
+PASS member aliases remain owner-scoped; no global suffix fan-out
+PASS caller-only owner-scoped aliases rebuild a missing provider ABI
+PASS iterative javac linker resolves chained aliases across shadow regeneration rounds
+PASS exact JADX JOBF class/package/member mappings override alias heuristics
+PASS javac argument attribution selects one exact overloaded DEX descriptor for an alias
+
+[*] Hybrid source/binary boundary: validated APK ABI shadow promoted -> apk2project-apk-shadow-abi.jar
+PASS rejected shadow candidate cannot overwrite last known-good live checkpoint
+PASS validated shadow candidate is atomically promoted with ownership/source-list checkpoint
+
+[*] Hybrid binary-source quarantine: moved 2 file(s) out of app/src/main/java -> /tmp/v261-obf-9j4ojk2r/analysis/hybrid-binary-source-archive/java
+PASS obfuscated ownership preset overrides app package and moves binary source out of active Java tree
+
+PASS 33-to-100 unconditional rollback + batch bisection
+PASS singleton regression blacklists exact candidate
+PASS monotonic improvement commits lower error count
+
+
+[*] Resume safety snapshot: /tmp/v23-resume-7jll68ge/analysis/source-repair/resume-baselines/resume-20261007T171916.433454Z.zip
+PASS 3-to-1000 targeted JADX rollback
+PASS pre-javac failure does not validate source transaction
+PASS blacklist/history state persists across sessions
+PASS resume safety snapshot
+
+PASS inverse JADX alias mapping
+PASS smali oracle reconstructs JADX-aliased RecyclerView method signature
+PASS JVM $ nested class spelling normalized to Java source syntax
+PASS pre-this() decompiler temporaries inlined into first constructor statement
+PASS int-to-boolean DEX lowering repair
+ALL V24 FRONTIER/ORACLE CASES PASS
+PASS blocker repair may advance compiler frontier even when newly visible error count rises
+PASS missing APK-private member resurrects over-pruned whole provider source
+PASS bulk smali provider surface repairs multiple exact missing members before caller ownership filtering
+PASS exact DEX field descriptor corrects a poisoned reconstructed field type at the provider
+PASS distributed toxic-class fallback can quarantine one failing method body transactionally
+

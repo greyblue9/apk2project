@@ -1,0 +1,77 @@
+=== py_compile ===
+PASS
+=== javac helper ===
+PASS
+
+=== tests/smoke_source_repair.py ===
+[repair] indexing Java source tree for semantic repair evidence
+[repair] [93m[JAVA-GRAPH][FRONTIER][0m 1 javac errors; providers: Object=1
+[repair] [93m[JAVA-GRAPH][FILES][0m Test.java=1
+[repair] [95m[JAVA-TREE][BUILD][0m compiling SourceAnalyzer.java
+[repair] [92m[JAVA-TREE][BUILD] helper ready[0m
+[repair] [96m[1m[JAVA-TREE][0m[96m[BEGIN] [0manalyzing 1 Java source file(s), trace-level=2
+[repair] [96m[1m[JAVA-TREE][0m[96m[OPEN] [0m/tmp/apk2project-repair-test-q0keyo69/src/p/Test.java  bytes=84
+[repair] [96m[1m[JAVA-TREE][0m[96m[SCAN] [0mTest.java  package=p  imports=0  chars=84
+[repair] [94m[1m[JAVA-TREE][0m[94m[TYPE] [0mp.Test  class  line=2
+[repair] [95m[1m[JAVA-TREE][0m[95m[METHOD] [0mp.Test.x() -> void  line=3
+[repair] [92m[1m[JAVA-TREE][0m[92m[DONE] [0mTest.java  61ms  types=1  methods=1  vars=1  calls=1  members=1  erroneous=0
+[repair] [92m[JAVA-TREE][FACTS][0m Test.java: 8 facts in 0.38s (types=1, methods=1, vars=1, calls=1, erroneous=0)
+[repair] [96m[JAVA-REPAIR][CANDIDATES][0m 1 candidate edit(s): specialize-object-type=1
+[repair] [92m[JAVA-REPAIR][SELECT][0m selected 1 edit(s) for transactional compile validation
+[repair] [92m[JAVA-REPAIR][EDIT][0m Test.java: specialize-object-type conf=0.990 — r0: Object -> Foo; initializer constructs this type
+[repair] semantic Java repair round 1: 1 edit(s) in 1 file(s)
+PASS: Object -> Foo inference, source edit, compile validation, transaction commit
+
+=== tests/regression_cases.py ===
+PASS lost-local
+PASS constructor-overload
+PASS impossible-cast
+PASS enhanced-for
+PASS enum-compat
+PASS missing-field-add
+PASS missing-field-assign
+ALL REGRESSION CASES PASS
+
+=== tests/search_strategy.py ===
+PASS 33-to-100 unconditional rollback + batch bisection
+PASS singleton regression blacklists exact candidate
+PASS monotonic improvement commits lower error count
+
+=== tests/resume_safety.py ===
+[*] Resume safety snapshot: /tmp/v23-resume-ewafnhvx/analysis/source-repair/resume-baselines/resume-20261007T091002.969983Z.zip
+PASS 3-to-1000 targeted JADX rollback
+PASS pre-javac failure does not validate source transaction
+PASS blacklist/history state persists across sessions
+PASS resume safety snapshot
+
+=== tests/v24_frontier_oracle_cases.py ===
+PASS inverse JADX alias mapping
+PASS smali oracle reconstructs JADX-aliased RecyclerView method signature
+PASS JVM $ nested class spelling normalized to Java source syntax
+PASS pre-this() decompiler temporaries inlined into first constructor statement
+PASS int-to-boolean DEX lowering repair
+ALL V24 FRONTIER/ORACLE CASES PASS
+PASS blocker repair may advance compiler frontier even when newly visible error count rises
+PASS missing APK-private member resurrects over-pruned whole provider source
+PASS bulk smali provider surface repairs multiple exact missing members before caller ownership filtering
+PASS exact DEX field descriptor corrects a poisoned reconstructed field type at the provider
+PASS distributed toxic-class fallback can quarantine one failing method body transactionally
+PASS inverse JADX alias mapping
+PASS smali oracle reconstructs JADX-aliased RecyclerView method signature
+PASS JVM $ nested class spelling normalized to Java source syntax
+PASS pre-this() decompiler temporaries inlined into first constructor statement
+PASS int-to-boolean DEX lowering repair
+ALL V24 FRONTIER/ORACLE CASES PASS
+PASS blocker repair may advance compiler frontier even when newly visible error count rises
+PASS missing APK-private member resurrects over-pruned whole provider source
+PASS bulk smali provider surface repairs multiple exact missing members before caller ownership filtering
+PASS exact DEX field descriptor corrects a poisoned reconstructed field type at the provider
+PASS distributed toxic-class fallback can quarantine one failing method body transactionally
+rc=0
+PASS binary island expands two failing Guava classes to complete artifact/source overlap
+PASS safe binary islands retain APK/R8 alias-heavy provider source
+PASS complete Gradle runtime inventory includes transitive JARs as well as AARs
+PASS javac-driven emergency promotion can discover exact library binary and inject Gradle dependency
+PASS resume mode can append read-only runtime inventory without rewriting dependency classpath
+ALL BINARY ISLAND CASES PASS
+rc=0

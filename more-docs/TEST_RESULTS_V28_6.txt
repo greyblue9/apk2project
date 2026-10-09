@@ -1,0 +1,55 @@
+===== tests/binary_island_cases.py =====
+PASS binary island expands two failing Guava classes to complete artifact/source overlap
+PASS safe binary islands retain APK/R8 alias-heavy provider source
+PASS complete Gradle runtime inventory includes transitive JARs as well as AARs
+PASS javac-driven emergency promotion can discover exact library binary and inject Gradle dependency
+PASS resume mode can append read-only runtime inventory without rewriting dependency classpath
+ALL BINARY ISLAND CASES PASS
+PASSFILE tests/binary_island_cases.py
+
+===== tests/hybrid_gradle_classpath_case.py =====
+PASS hybrid shadow classpath injection tolerates AGP null classpath during configuration
+PASSFILE tests/hybrid_gradle_classpath_case.py
+
+===== tests/hybrid_shadow_cases.py =====
+PASS broken non-app JADX source is bypassed by APK ABI shadow
+PASS DEX generic Signature supports typed enhanced-for
+PASS DEX ConstantValue remains a javac constant
+PASS JADX method/field aliases are exported on binary-owned class
+PASS InnerClasses metadata resolves JADX-renamed nested class
+PASS javac internals attribute app source against shadow ABI symbols
+PASS structured JCDiagnostic exposes found/required javac Type objects
+PASS javac Types computes castability/convertibility instead of regex guessing
+PASS missing provider source can be resurrected from import alias + smali
+PASS generalized JADX class alias maps AbstractComponentCallbacksC####x -> raw x
+PASS JADX mo####x override aliases map to raw method names
+PASS member aliases remain owner-scoped; no global suffix fan-out
+PASS caller-only owner-scoped aliases rebuild a missing provider ABI
+PASS iterative javac linker resolves chained aliases across shadow regeneration rounds
+PASS exact JADX JOBF class/package/member mappings override alias heuristics
+PASS javac argument attribution selects one exact overloaded DEX descriptor for an alias
+PASSFILE tests/hybrid_shadow_cases.py
+
+===== tests/hybrid_transactional_shadow.py =====
+[*] Hybrid source/binary boundary: validated APK ABI shadow promoted -> apk2project-apk-shadow-abi.jar
+PASS rejected shadow candidate cannot overwrite last known-good live checkpoint
+PASS validated shadow candidate is atomically promoted with ownership/source-list checkpoint
+PASSFILE tests/hybrid_transactional_shadow.py
+
+===== tests/obfuscated_binary_ownership.py =====
+[*] Hybrid binary-source quarantine: moved 2 file(s) out of app/src/main/java -> /tmp/v261-obf-4q_7kxeg/analysis/hybrid-binary-source-archive/java
+PASS obfuscated ownership preset overrides app package and moves binary source out of active Java tree
+PASSFILE tests/obfuscated_binary_ownership.py
+
+===== tests/regression_cases.py =====
+PASS lost-local
+PASS constructor-overload
+PASS impossible-cast
+PASS enhanced-for
+PASS enum-compat
+PASS missing-field-add
+PASS missing-field-assign
+ALL REGRESSION CASES PASS
+PASSFILE tests/regression_cases.py
+
+===== tests/resume_safety.py =====

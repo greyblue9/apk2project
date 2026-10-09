@@ -1,0 +1,148 @@
+v28.5 regression results
+Thu Oct  8 23:52:25 UTC 2026
+===== tests/binary_island_cases.py =====
+PASS binary island expands two failing Guava classes to complete artifact/source overlap
+PASS safe binary islands retain APK/R8 alias-heavy provider source
+PASS complete Gradle runtime inventory includes transitive JARs as well as AARs
+PASS javac-driven emergency promotion can discover exact library binary and inject Gradle dependency
+PASS resume mode can append read-only runtime inventory without rewriting dependency classpath
+ALL BINARY ISLAND CASES PASS
+PASS tests/binary_island_cases.py
+===== tests/hybrid_gradle_classpath_case.py =====
+PASS hybrid shadow classpath injection tolerates AGP null classpath during configuration
+PASS tests/hybrid_gradle_classpath_case.py
+===== tests/hybrid_shadow_cases.py =====
+PASS broken non-app JADX source is bypassed by APK ABI shadow
+PASS DEX generic Signature supports typed enhanced-for
+PASS DEX ConstantValue remains a javac constant
+PASS JADX method/field aliases are exported on binary-owned class
+PASS InnerClasses metadata resolves JADX-renamed nested class
+PASS javac internals attribute app source against shadow ABI symbols
+PASS structured JCDiagnostic exposes found/required javac Type objects
+PASS javac Types computes castability/convertibility instead of regex guessing
+PASS missing provider source can be resurrected from import alias + smali
+PASS generalized JADX class alias maps AbstractComponentCallbacksC####x -> raw x
+PASS JADX mo####x override aliases map to raw method names
+PASS member aliases remain owner-scoped; no global suffix fan-out
+PASS caller-only owner-scoped aliases rebuild a missing provider ABI
+PASS iterative javac linker resolves chained aliases across shadow regeneration rounds
+PASS exact JADX JOBF class/package/member mappings override alias heuristics
+PASS javac argument attribution selects one exact overloaded DEX descriptor for an alias
+PASS tests/hybrid_shadow_cases.py
+===== tests/hybrid_transactional_shadow.py =====
+[*] Hybrid source/binary boundary: validated APK ABI shadow promoted -> apk2project-apk-shadow-abi.jar
+PASS rejected shadow candidate cannot overwrite last known-good live checkpoint
+PASS validated shadow candidate is atomically promoted with ownership/source-list checkpoint
+PASS tests/hybrid_transactional_shadow.py
+===== tests/obfuscated_binary_ownership.py =====
+[*] Hybrid binary-source quarantine: moved 2 file(s) out of app/src/main/java -> /tmp/v261-obf-5juybyx7/analysis/hybrid-binary-source-archive/java
+PASS obfuscated ownership preset overrides app package and moves binary source out of active Java tree
+PASS tests/obfuscated_binary_ownership.py
+===== tests/regression_cases.py =====
+PASS lost-local
+PASS constructor-overload
+PASS impossible-cast
+PASS enhanced-for
+PASS enum-compat
+PASS missing-field-add
+PASS missing-field-assign
+ALL REGRESSION CASES PASS
+PASS tests/regression_cases.py
+===== tests/resume_safety.py =====
+[*] Resume safety snapshot: /tmp/v23-resume-8k3oc63f/analysis/source-repair/resume-baselines/resume-20261008T235257.268156Z.zip
+PASS 3-to-1000 targeted JADX rollback
+PASS pre-javac failure does not validate source transaction
+PASS blacklist/history state persists across sessions
+PASS resume safety snapshot
+PASS tests/resume_safety.py
+===== tests/search_strategy.py =====
+PASS 33-to-100 unconditional rollback + batch bisection
+PASS singleton regression blacklists exact candidate
+PASS monotonic improvement commits lower error count
+PASS tests/search_strategy.py
+===== tests/smoke_source_repair.py =====
+[repair] indexing Java source tree for semantic repair evidence
+[repair] [93m[JAVA-GRAPH][FRONTIER][0m 1 javac errors; providers: Object=1
+[repair] [93m[JAVA-GRAPH][FILES][0m Test.java=1
+[repair] [95m[JAVA-TREE][BUILD][0m compiling SourceAnalyzer.java
+[repair] [92m[JAVA-TREE][BUILD] helper ready[0m
+[repair] [96m[1m[JAVA-TREE][0m[96m[BEGIN] [0manalyzing 1 Java source file(s), trace-level=2
+[repair] [96m[1m[JAVA-TREE][0m[96m[OPEN] [0m/tmp/apk2project-repair-test-8s4uq8xk/src/p/Test.java  bytes=84
+[repair] [96m[1m[JAVA-TREE][0m[96m[SCAN] [0mTest.java  package=p  imports=0  chars=84
+[repair] [94m[1m[JAVA-TREE][0m[94m[TYPE] [0mp.Test  class  line=2
+[repair] [95m[1m[JAVA-TREE][0m[95m[METHOD] [0mp.Test.x() -> void  line=3
+[repair] [92m[1m[JAVA-TREE][0m[92m[DONE] [0mTest.java  37ms  types=1  methods=1  vars=1  calls=1  members=1  erroneous=0
+[repair] [92m[JAVA-TREE][FACTS][0m Test.java: 8 facts in 0.35s (types=1, methods=1, vars=1, calls=1, erroneous=0)
+[repair] [96m[JAVA-REPAIR][CANDIDATES][0m 1 candidate edit(s): specialize-object-type=1
+[repair] [92m[JAVA-REPAIR][SELECT][0m selected 1 edit(s) for transactional compile validation
+[repair] [92m[JAVA-REPAIR][EDIT][0m Test.java: specialize-object-type conf=0.990 — r0: Object -> Foo; initializer constructs this type
+[repair] semantic Java repair round 1: 1 edit(s) in 1 file(s)
+PASS: Object -> Foo inference, source edit, compile validation, transaction commit
+PASS tests/smoke_source_repair.py
+===== tests/v24_frontier_oracle_cases.py =====
+PASS inverse JADX alias mapping
+PASS smali oracle reconstructs JADX-aliased RecyclerView method signature
+PASS JVM $ nested class spelling normalized to Java source syntax
+PASS pre-this() decompiler temporaries inlined into first constructor statement
+PASS int-to-boolean DEX lowering repair
+ALL V24 FRONTIER/ORACLE CASES PASS
+PASS blocker repair may advance compiler frontier even when newly visible error count rises
+PASS missing APK-private member resurrects over-pruned whole provider source
+PASS bulk smali provider surface repairs multiple exact missing members before caller ownership filtering
+PASS exact DEX field descriptor corrects a poisoned reconstructed field type at the provider
+PASS distributed toxic-class fallback can quarantine one failing method body transactionally
+PASS tests/v24_frontier_oracle_cases.py
+===== tests/v27_2_ssa_clinit.py =====
+PASS JADX SSA ArrayList/List/List/? -> javac Types.lub = List
+PASS unknown SSA version is non-vetoing when no contradictory source constraint exists
+PASS over-specific SSA declaration is widened only after receiver-member validation
+PASS source-use constraint vetoes LUB when required member exists only on concrete subtype
+PASS simple interface <clinit> is translated to legal field initializers, not deleted
+PASS complex interface <clinit> is preserved for binary-shadow/later structured repair
+PASS tests/v27_2_ssa_clinit.py
+===== tests/v27_3_library_boundary.py =====
+PASS nested JOBF aliases preserve outer identity and cannot flatten/collide
+PASS hybrid ownership is enforced again on final JavaCompile.source
+PASS tests/v27_3_library_boundary.py
+===== tests/v27_4_1_gradle_escape.py =====
+PASS rerun repairs an already-malformed marked hybrid Gradle block before Gradle parses it
+PASS tests/v27_4_1_gradle_escape.py
+===== tests/v27_4_realapk_boundary.py =====
+PASS observed top-level JADX flattening overrides nested JOBF mapping only with source evidence
+PASS intentional source-only shell receives explicit S provenance
+PASS merged-manifest AndroidX components do not become app-owned source roots
+PASS tests/v27_4_realapk_boundary.py
+===== tests/v27_5_synthetic_visibility.py =====
+PASS synthetic DEX shim method is source-visible in shadow ABI
+PASS synthetic DEX constructor is source-visible in shadow ABI
+PASS shadow facade strips ACC_SYNTHETIC/ACC_BRIDGE implementation flags
+PASS tests/v27_5_synthetic_visibility.py
+===== tests/v28_4_dexlib_boundary.py =====
+[*] v28.5: using standalone dexlib2 from /tmp/v28.4-dexlib-1g2ftn3i/smali-dexlib2-3.0.10.jar (com.android.tools.smali.dexlib2)
+PASS partial Apktool dexlib shading is rejected
+PASS standalone complete dexlib API is accepted
+PASS Java regex remains correctly escaped
+PASS --rebuild-apk hybrid setup is fail-closed
+PASS tests/v28_4_dexlib_boundary.py
+===== tests/v28_5_direct_dexlib_boundary.py =====
+[*] v28.5: using standalone dexlib2 from /tmp/v28.5-dexlib-8rnfrfhg/smali-dexlib2-3.0.10.jar (com.android.tools.smali.dexlib2)
+PASS Apktool shading is not accepted as a dexlib distribution
+PASS runtime helper directly imports official com.android.tools.smali dexlib2
+PASS reflection/org.jf compatibility shim is gone
+PASS early hybrid/source engine excludes DexHybridRebuilder
+PASS call-site/encoded-value/annotation runtime references are covered
+PASS Java alias regex remains correctly escaped
+PASS --rebuild-apk source boundary remains fail-closed
+PASS tests/v28_5_direct_dexlib_boundary.py
+===== tests/v28_hybrid_apk.py =====
+PASS runtime plan excludes R.java and preserves binary-only classes
+PASS compiled replacement set includes owner companions but excludes scaffolding/unowned classes
+PASS compiled R constants are gated against the original resource-ID universe
+PASS APK repack preserves manifest/resources/assets/native payload and drops obsolete signatures
+[*] v28.5: using standalone dexlib2 from /tmp/apk2project-v28-lxpdflx2/smali-dexlib2-3.0.10.jar (com.android.tools.smali.dexlib2)
+PASS complete dexlib API gate rejects partial Apktool shading
+PASS bytecode dealiaser rewrites app definitions and binary references to raw DEX ABI
+PASS invokedynamic lambda SAM name is dealiased with its functional-interface ABI
+PASS replacement ABI gate makes missing non-private members fatal and private omissions visible
+PASS tests/v28_hybrid_apk.py
+ALL 18 TEST SCRIPTS PASS
