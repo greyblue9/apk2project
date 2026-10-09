@@ -14,15 +14,12 @@ EXPORTS=(
 )
 CORE=()
 for f in "$HERE"/*.java; do
+  # DexHybridRebuilder is intentionally compiled later by hybrid_apk.py after
+  # apk2project has resolved its own pinned smali-dexlib2 runtime bundle.
   [[ "$(basename "$f")" == "DexHybridRebuilder.java" ]] && continue
   CORE+=("$f")
 done
 javac "${EXPORTS[@]}" -d "$OUT" "${CORE[@]}"
-if [[ -n "${DEXLIB_CP:-}" ]]; then
-  javac "${EXPORTS[@]}" -cp "$OUT:$DEXLIB_CP" -d "$OUT" "$HERE/DexHybridRebuilder.java"
-  echo "Compiled core + direct dexlib runtime helper -> $OUT"
-else
-  echo "Compiled dexlib-independent core engine -> $OUT"
-  echo "Set DEXLIB_CP to the standalone smali-dexlib2 runtime classpath to compile DexHybridRebuilder too."
-fi
+echo "Compiled dexlib-independent core engine -> $OUT"
+echo "DexHybridRebuilder is compiled on demand by apk2project against its pinned dexlib2 bundle."
 printf '%s\n' "${EXPORTS[@]}" > "$HERE/add-exports.args"

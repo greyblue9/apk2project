@@ -28,6 +28,14 @@ from dataclasses import dataclass, field, asdict
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
+# Keep sibling modules importable when apk2project.py is loaded via importlib/spec,
+# not only when executed as a script from its own directory.
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+
+from toolchain import APKTOOL_VERSION, JADX_VERSION, ensure_decompiler_tools, tool_versions
+
 try:
     from lxml import etree as LET
 except ImportError:
@@ -152,11 +160,6 @@ def accept_android_licenses(sdk: Path | None = None, _seen=None):
   
 
 
-APKTOOL_VERSION = "3.0.3"
-JADX_VERSION = "1.5.6"
-APKTOOL_URL = f"https://github.com/iBotPeaches/Apktool/releases/download/v{APKTOOL_VERSION}/apktool_{APKTOOL_VERSION}.jar"
-JADX_URL = f"https://github.com/skylot/jadx/releases/download/v{JADX_VERSION}/jadx-{JADX_VERSION}.zip"
-APKTOOL_SHA256 = "dbf930b076c6b9be08d57c449cacefc3bdd6b71ebd59b3066fc0e1f5b14f9423"
 CENTRAL_SEARCH = "https://search.maven.org/solrsearch/select"
 CENTRAL_REPO = "https://repo1.maven.org/maven2"
 GOOGLE_REPO = "https://dl.google.com/dl/android/maven2"
@@ -184,12 +187,12 @@ PLATFORM = (
 )
 
 
-SCRIPT_VERSION = "bulletproof-v28.4-standalone-dexlib"
+SCRIPT_VERSION = "v29.0-pinned-toolchain"
 
 VERBOSE = 1
 
 
-_LOG_LOCK = __import__("threading").Lock()
+_LOG_LOCK = threading.Lock()
 
 _USE_COLOR = (
     os.environ.get("NO_COLOR") is None
@@ -317,27 +320,8 @@ def sha256(p):
 
 
 def bootstrap(d):
-    d.mkdir(parents=True, exist_ok=True)
-    aj = d / f"apktool_{APKTOOL_VERSION}.jar"
-    if not aj.exists():
-        download(APKTOOL_URL, aj)
-    if sha256(aj) != APKTOOL_SHA256:
-        die("Apktool SHA-256 mismatch")
-    jd = d / f"jadx-{JADX_VERSION}"
-    jb = jd / "bin/jadx"
-    if not jb.exists():
-        z = d / f"jadx-{JADX_VERSION}.zip"
-        if not z.exists():
-            download(JADX_URL, z)
-        with zipfile.ZipFile(z) as q:
-            q.extractall(jd)
-        hits = list(jd.rglob("bin/jadx"))
-        if hits:
-            jb = hits[0]
-    if not jb.exists():
-        die("Could not locate JADX launcher after extraction")
-    jb.chmod(jb.stat().st_mode | stat.S_IXUSR)
-    return aj, jb
+    """Return apk2project's pinned Apktool/JADX pair from its owned tool cache."""
+    return ensure_decompiler_tools(Path(d).expanduser())
 
 
 def cp(a, b):
@@ -2639,7 +2623,7 @@ def prune(root, source_files, selected, mode, aggressive):
         elif mode=="move":
             q=dest/fp.relative_to(java_root); q.parent.mkdir(parents=True,exist_ok=True)
             if q.exists(): q.unlink()
-            __import__("shutil").move(str(fp),str(q)); moved.append(c)
+            shutil.move(str(fp),str(q)); moved.append(c)
     for d in sorted(java_root.rglob("*"),reverse=True):
         if d.is_dir():
             try:d.rmdir()
@@ -4863,7 +4847,7 @@ def diagnose_and_repair_merged_resources(out, analysis_dir, selected, gradle_out
 # v11: installed-SDK selection, quieter Termux Gradle, tracing/diagnostics
 # ---------------------------------------------------------------------------
 
-SCRIPT_VERSION = "bulletproof-v28.4-standalone-dexlib"
+SCRIPT_VERSION = "v29.0-pinned-toolchain"
 
 PROCESS_CYAN = "\033[96m"
 PROCESS_RESET = "\033[0m"
@@ -5835,92 +5819,44 @@ _JAVAC_ERROR_FILE_RE = re.compile(
 _JADX_INVALID_REGISTER_RE = re.compile(r"(?m)^\s*\?\?\s+(?:r\d+|[A-Za-z_$][\w$]*)\b")
 
 
-def _jadx_help_text(jadx_command):
-    """Return JADX help without polluting normal build output."""
-    try:
-        proc = subprocess.run(
-            [*map(str, jadx_command), "--help"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            errors="replace",
-            timeout=30,
-        )
-        return proc.stdout or ""
-    except Exception:
-        return ""
-
-
-def _jadx_compile_oriented_args(jadx_command, mode="auto"):
-    """Use only conservative switches supported by the installed JADX."""
-    help_text = _jadx_help_text(jadx_command)
-    # JADX 1.5.6 (the bootstrapped version) supports all of these.  Filtering by
-    # --help keeps a system-installed older/newer JADX from failing just because
-    # one optional conservative switch changed name.
-    candidates = [
-        ("--decompilation-mode", ["--decompilation-mode", mode]),
-        ("--no-inline-methods", ["--no-inline-methods"]),
-        ("--no-inline-anonymous", ["--no-inline-anonymous"]),
-        ("--no-inline-kotlin-lambda", ["--no-inline-kotlin-lambda"]),
-        ("--no-finally", ["--no-finally"]),
+def _jadx_compile_oriented_args(mode="auto"):
+    """Compile-oriented arguments for apk2project's pinned JADX 1.5.6."""
+    return [
+        "--decompilation-mode", mode,
+        "--no-inline-methods",
+        "--no-inline-anonymous",
+        "--no-inline-kotlin-lambda",
+        "--no-finally",
     ]
-    if not help_text:
-        # The bundled JADX is pinned, so these are safe there.  For an unknown
-        # launcher whose help cannot be read, keep only the universally useful
-        # mode switch rather than risking failure on optional flags.
-        return ["--decompilation-mode", mode]
-    out = []
-    for flag, argv in candidates:
-        if flag in help_text:
-            out.extend(argv)
-        else:
-            detail(f"JADX does not advertise {flag}; skipping that optional conservative flag", 2)
-    return out
 
 
-def _jadx_deobf_map_args(jadx_command, map_path, mode="read-or-save"):
-    """Ask JADX to persist/reuse its exact auto-generated JOBF rename map when supported.
-
-    JOBF contains owner+descriptor scoped class/field/method aliases and is therefore
-    much stronger evidence for the APK shadow linker than reversing C####/m####/f####
-    names heuristically.  Older/system JADX launchers that do not advertise these
-    options simply fall back to the semantic/DEX linker.
-    """
+def _jadx_deobf_map_args(map_path, mode="read-or-save"):
+    """Use the pinned JADX JOBF mapping surface directly, without capability probing."""
     if map_path is None:
-        return []
-    help_text = _jadx_help_text(jadx_command)
-    if not help_text or "--deobf-cfg-file" not in help_text:
         return []
     map_path = Path(map_path)
     map_path.parent.mkdir(parents=True, exist_ok=True)
-    out = ["--deobf-cfg-file", str(map_path)]
-    if "--deobf-cfg-file-mode" in help_text:
-        out += ["--deobf-cfg-file-mode", mode]
-    return out
+    return ["--deobf-cfg-file", str(map_path), "--deobf-cfg-file-mode", mode]
 
 
 def _ensure_jadx_deobf_map(jadx_command, apk, map_path, scratch_root):
-    """Best-effort one-time JOBF bootstrap for resumed projects created before v27.
-
-    JADX can build its auto-rename table without emitting source/resources.  This lets a
-    --keep-work project gain exact owner+descriptor aliases without replacing a single
-    manually repaired Java file.  Failure is non-fatal: the DEX+javac linker remains.
-    """
+    """Best-effort one-time JOBF bootstrap for resumed projects created before v27."""
     map_path = Path(map_path)
     if map_path.is_file() and map_path.stat().st_size:
         return True
-    help_text = _jadx_help_text(jadx_command)
-    if "--deobf-cfg-file" not in help_text:
-        return False
     scratch_root = Path(scratch_root)
     shutil.rmtree(scratch_root, ignore_errors=True)
     scratch_root.mkdir(parents=True, exist_ok=True)
-    cmd = [*jadx_command, "--deobf", *_jadx_deobf_map_args(jadx_command, map_path, mode="overwrite")]
-    if "--no-src" in help_text:
-        cmd.append("--no-src")
-    if "--no-res" in help_text:
-        cmd.append("--no-res")
-    cmd += ["--log-level", "warn", "-d", str(scratch_root), str(apk)]
+    cmd = [
+        *jadx_command,
+        "--deobf",
+        *_jadx_deobf_map_args(map_path, mode="overwrite"),
+        "--no-src",
+        "--no-res",
+        "--log-level", "warn",
+        "-d", str(scratch_root),
+        str(apk),
+    ]
     proc = _quiet_subprocess(cmd)
     try:
         (scratch_root.parent / "jadx-map-probe.log").write_text(proc.stdout or "")
@@ -6322,16 +6258,7 @@ def targeted_jadx_javac_repair(
         audit_path.write_text("[]\n")
         return changed, audit
 
-    help_text = _jadx_help_text(jadx_command)
-    if help_text and ("--single-class" not in help_text or "--single-class-output" not in help_text):
-        warn("Installed JADX does not support targeted --single-class output; javac source repair skipped")
-        audit_path.parent.mkdir(parents=True, exist_ok=True)
-        audit_path.write_text(json.dumps([{"status": "skipped", "reason": "JADX lacks --single-class output"}], indent=2) + "\n")
-        return changed, audit
-
-    advertised_modes = ["auto"]
-    if not help_text or "--decompilation-mode" in help_text:
-        advertised_modes += ["restructure", "simple"]
+    advertised_modes = ["auto", "restructure", "simple"]
 
     scratch_root = analysis_dir / "jadx-targeted-repair"
     backup_root = analysis_dir / "jadx-targeted-originals"
@@ -6393,9 +6320,9 @@ def targeted_jadx_javac_repair(
                 *jadx_command,
                 "--single-class", fqcn,
                 "--single-class-output", single_output,
-                *_jadx_compile_oriented_args(jadx_command, mode=mode),
+                *_jadx_compile_oriented_args(mode=mode),
                 *(["--deobf"] if need_deobf else []),
-                *(_jadx_deobf_map_args(jadx_command, jadx_map, mode="read") if need_deobf else []),
+                *(_jadx_deobf_map_args(jadx_map, mode="read") if need_deobf else []),
                 # APK/DEX input is handled by JADX's dex-input plugin.  Do not
                 # force java-convert.mode here: that plugin only converts
                 # .class/.jar/.aar inputs to DEX and is irrelevant to APK DEX
@@ -6531,6 +6458,30 @@ def ensure_hybrid_java_engine(project_root):
         raise RuntimeError("could not compile Java hybrid engine")
     log(f"Compiled Java hybrid engine with JDK internals -> {classes}")
     return classes
+
+
+def dump_dex_class_tree(apk_path, project_root):
+    """Dump the complete original APK superclass forest directly from DEX metadata."""
+    project_root=Path(project_root)
+    analysis=project_root/'analysis'
+    analysis.mkdir(parents=True,exist_ok=True)
+    classes=ensure_hybrid_java_engine(project_root)
+    text=analysis/'dex-class-tree.txt'
+    json_out=analysis/'dex-class-tree.json'
+    cmd=[
+        'java', *_HYBRID_JAVA_EXPORTS,
+        '-cp', str(classes),
+        'apk2project.hybrid.DexTreeDumper',
+        '--apk', str(Path(apk_path).resolve()),
+        '--text', str(text),
+        '--json', str(json_out),
+    ]
+    proc=run(cmd,check=False,capture=True)
+    if proc.returncode:
+        raise RuntimeError('DEX class tree dump failed')
+    log(f'DEX class tree -> {text}')
+    detail(f'DEX class tree JSON -> {json_out}',1)
+    return text,json_out
 
 
 def _manifest_root_classes(manifest_path, package_name):
@@ -6951,7 +6902,10 @@ def main():
     ap.add_argument(
         "--tools-dir", type=Path, default=Path.home() / ".local/share/apk2project/tools"
     )
-    ap.add_argument("--install-tools", action="store_true")
+    ap.add_argument(
+        "--dump-class-tree", action="store_true",
+        help="dump the complete original DEX superclass tree to analysis/dex-class-tree.{txt,json}",
+    )
     ap.add_argument("--install-sdk", action="store_true", help="bootstrap/configure a native Termux Android SDK and build script")
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--keep-work", action="store_true")
@@ -7055,22 +7009,17 @@ def main():
     ap.add_argument(
         "--rebuild-apk", action="store_true",
         help=(
-            "v28: after a successful hybrid-shadow javac build, rebuild the runtime APK by "
+            "v29: compile source if needed, then rebuild the runtime APK by "
             "preserving original resources/binary DEX classes and replacing only source-owned classes"
         ),
     )
     ap.add_argument(
         "--hybrid-apk-sign", choices=("off", "debug"), default="debug",
-        help="v28 APK output signing: off or reusable ~/.android/debug.keystore (default: debug)",
+        help="v29 APK output signing: off or reusable ~/.android/debug.keystore (default: debug)",
     )
     ap.add_argument(
         "--hybrid-apk-output", type=Path, default=None,
-        help="output path for the v28 unsigned hybrid APK; default: app/build/outputs/apk/hybrid/...",
-    )
-    ap.add_argument(
-        "--dexlib-jar", type=Path, default=None,
-        help=("official standalone com.android.tools.smali smali-dexlib2 jar or directory; "
-              "normally resolved from apk2project/Gradle/Maven caches or bootstrapped automatically"),
+        help="output path for the v29 unsigned hybrid APK; default: app/build/outputs/apk/hybrid/...",
     )
     ap.add_argument(
         "--java-repair", choices=("off", "safe", "balanced", "aggressive"), default="balanced",
@@ -7207,10 +7156,12 @@ def main():
         help="record Java Flight Recorder samples from the Gradle launcher/in-process AGP into analysis/gradle.jfr",
     )
     z = ap.parse_args()
+    if z.rebuild_apk and not z.compile:
+        z.compile = True
     global VERBOSE, SHOW_GRADLE_NOISE
     VERBOSE = z.verbose
     SHOW_GRADLE_NOISE = z.show_gradle_noise
-    if getattr(z, "apktool_framework_dir", None):
+    if z.apktool_framework_dir:
         register_apktool_framework_dir(z.apktool_framework_dir)
     log(f"apk2project {SCRIPT_VERSION}")
     if not callable(globals().get("resolve")):
@@ -7233,24 +7184,32 @@ def main():
     resume_project = had_existing_java_tree and not z.refresh_sources
     if resume_project:
         log(f"Resume checkpoint detected: preserving existing Java/classpath state under {out}")
-    apktool_jar = jadx_binary = None
-    if z.install_tools:
-        if not shutil.which("java"):
-            die("Install Java: pkg install openjdk-21")
+    java = shutil.which("java")
+    if not java:
+        die("Java is required (Termux: pkg install openjdk-21)")
+    try:
         apktool_jar, jadx_binary = bootstrap(z.tools_dir.expanduser())
-
-    apktool_command = (
-        [shutil.which("apktool")]
-        if shutil.which("apktool")
-        else ([shutil.which("java"), "-jar", apktool_jar] if apktool_jar else None)
+    except Exception as exc:
+        die("could not bootstrap apk2project pinned tools: " + str(exc))
+    apktool_command = [java, "-jar", apktool_jar]
+    jadx_command = [jadx_binary]
+    log(
+        f"Pinned toolchain: Apktool {APKTOOL_VERSION}, JADX {JADX_VERSION}; "
+        f"cache={z.tools_dir.expanduser()}"
     )
-    jadx_command = (
-        [shutil.which("jadx")]
-        if shutil.which("jadx")
-        else ([jadx_binary] if jadx_binary else None)
-    )
-    if not apktool_command or not jadx_command:
-        die("apktool/jadx unavailable; use --install-tools")
+    analysis_boot = out / "analysis"
+    analysis_boot.mkdir(parents=True, exist_ok=True)
+    (analysis_boot / "toolchain.json").write_text(json.dumps({
+        "versions": tool_versions(),
+        "tools_dir": str(z.tools_dir.expanduser()),
+        "apktool_jar": str(apktool_jar),
+        "jadx": str(jadx_binary),
+    }, indent=2, sort_keys=True) + "\n")
+    if z.dump_class_tree:
+        try:
+            dump_dex_class_tree(apk, out)
+        except Exception as exc:
+            die("could not dump DEX class tree: " + str(exc))
 
     work_dir = out / "_work"
     work_dir.mkdir(exist_ok=True)
@@ -7293,10 +7252,10 @@ def main():
             # which are useful for inspection but impossible for javac to parse.
             jadx_proc = run(
                 jadx_command
-                + _jadx_compile_oriented_args(jadx_command)
+                + _jadx_compile_oriented_args()
                 + ([] if z.no_deobf else ["--deobf"])
                 + ([] if z.no_deobf else _jadx_deobf_map_args(
-                    jadx_command, jadx_map, mode=("overwrite" if z.refresh_sources else "read-or-save")
+                    jadx_map, mode=("overwrite" if z.refresh_sources else "read-or-save")
                 ))
                 # APK/DEX input uses JADX's dex-input plugin directly.  Do not
                 # force java-convert.mode=d8; that option applies only when JADX
@@ -8220,27 +8179,24 @@ def main():
             if final_rc:
                 warn(f"Gradle compile still exits {final_rc}; see analysis/compile.log and resource diagnostics")
     if z.rebuild_apk:
-        if not z.compile:
-            die("--rebuild-apk requires --compile so the replacement .class files are known-good")
         if z.hybrid_shadow == "off":
             die("--rebuild-apk currently requires --hybrid-shadow safe|permissive")
         if not compile_succeeded:
             die("--rebuild-apk refused because compileDebugJavaWithJavac did not succeed")
         if HybridApkRebuilder is None:
-            die("v28 hybrid APK module unavailable: " + str(_hybrid_apk_import_error))
-        log("v28: javac succeeded; rebuilding hybrid runtime APK from original DEX + source-owned replacements")
+            die("v29 hybrid APK module unavailable: " + str(_hybrid_apk_import_error))
+        log("v29: javac succeeded; rebuilding hybrid runtime APK from original DEX + source-owned replacements")
         try:
             hybrid_result = HybridApkRebuilder.rebuild(
                 apk, out,
-                dexlib_jar=z.dexlib_jar,
                 tools_dir=z.tools_dir.expanduser(),
                 output=z.hybrid_apk_output,
                 sign=z.hybrid_apk_sign,
             )
             produced = hybrid_result.get("signed_apk") or hybrid_result.get("package", {}).get("output")
-            log("v28 hybrid APK ready: " + str(produced))
+            log("v29 hybrid APK ready: " + str(produced))
         except Exception as exc:
-            die("v28 hybrid APK rebuild failed after successful javac: " + str(exc))
+            die("v29 hybrid APK rebuild failed after successful javac: " + str(exc))
 
     if dependency_build_errors and not z.learn_from_failed_builds:
         warn(f"Not learning from this run: Gradle reported {len(dependency_build_errors)} "

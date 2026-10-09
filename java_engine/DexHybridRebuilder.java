@@ -31,7 +31,7 @@ import java.util.zip.*;
 public final class DexHybridRebuilder {
     private static final Pattern DEX_ENTRY = Pattern.compile("classes(?:\\d+)?\\.dex");
 
-    // v28.8: merge diagnostics are intentionally verbose by default.  The hybrid
+    // v29: merge diagnostics are intentionally verbose by default.  The hybrid
     // runtime leg is where representation-boundary mistakes become expensive, so
     // keep a chronological trace of every universe/rewrite/validation transition.
     // Set APK2PROJECT_DEX_MERGE_VERBOSE=0 to suppress these diagnostics.
@@ -46,7 +46,7 @@ public final class DexHybridRebuilder {
         double seconds = mergeStartNanos == 0L ? 0.0 :
                 (System.nanoTime() - mergeStartNanos) / 1_000_000_000.0;
         String body = args.length == 0 ? format : String.format(Locale.ROOT, format, args);
-        System.out.printf(Locale.ROOT, "[*] v28.8 merge +%7.3fs | %s%n", seconds, body);
+        System.out.printf(Locale.ROOT, "[*] v29 merge +%7.3fs | %s%n", seconds, body);
         System.out.flush();
     }
 
@@ -95,7 +95,6 @@ public final class DexHybridRebuilder {
                     throw t;
                 }
             }
-            case "probe-dexlib" -> probeDexlib();
             default -> die("unknown command: " + a.command);
         }
     }
@@ -329,7 +328,7 @@ public final class DexHybridRebuilder {
         LinkedHashMap<String,String> appendedReplacementDex=new LinkedHashMap<>();
         List<String> finalDexEntries=new ArrayList<>(dexEntries);
         if(constructorBridgeRewriteCount>0)
-            System.out.println("[*] v28.8: lowered "+constructorBridgeRewriteCount+" DEX constructor bridge reference(s): "+String.join(" | ",constructorBridgeRulesUsed));
+            System.out.println("[*] v29: lowered "+constructorBridgeRewriteCount+" DEX constructor bridge reference(s): "+String.join(" | ",constructorBridgeRulesUsed));
 
         for(ReplacementDex rd:replDex){
             String outName=nextDex==1?"classes.dex":"classes"+nextDex+".dex";
@@ -354,7 +353,7 @@ public final class DexHybridRebuilder {
         // Validate exact final class universe with the dependency-free reader by
         // temporarily packaging output dex files into a tiny zip/APK container.
         mergePhase("validate exact final class universe");
-        Path probe=Files.createTempFile("apk2project-v28-merged-", ".apk");
+        Path probe=Files.createTempFile("apk2project-v29-merged-", ".apk");
         mergeLog("temporary class-universe probe=%s",probe);
         try(ZipOutputStream zo=new ZipOutputStream(Files.newOutputStream(probe))){
             for(String e:finalDexEntries){zo.putNextEntry(new ZipEntry(e));Files.copy(a.outDir.resolve(e),zo);zo.closeEntry();}
@@ -534,12 +533,6 @@ public final class DexHybridRebuilder {
         return d.startsWith("Ljava/")||d.startsWith("Ljavax/")||d.startsWith("Landroid/")||
                d.startsWith("Ldalvik/")||d.startsWith("Lcom/android/internal/")||d.startsWith("Lorg/w3c/")||
                d.startsWith("Lorg/xml/")||d.startsWith("Ljdk/")||d.startsWith("Lsun/");
-    }
-
-    private static void probeDexlib() throws Exception {
-        Dexlib d=new Dexlib(35);
-        System.out.println("dexlib_namespace=com.android.tools.smali.dexlib2");
-        System.out.println("dexlib_api="+d.opcodes.api);
     }
 
     /** Direct adapter for the official com.android.tools.smali:smali-dexlib2 API. */

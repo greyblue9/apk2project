@@ -25,7 +25,7 @@ required = [
 ]
 for token in required:
     assert token in src, token
-assert "'version':'v28.8'" in hybrid
+assert "'version':'v29.0'" in hybrid
 assert 'capture=True' in hybrid and "dex-merge.log" in hybrid
 print('PASS v28.8 merge has timestamped numbered phases and failure phase reporting')
 print('PASS v28.8 logs DEX ownership/rewrite/hash/universe transitions')

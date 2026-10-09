@@ -41,11 +41,29 @@ final class Json {
             for (Object x : it) { if (!first) b.append(','); first = false; b.append(value(x)); }
             return b.append(']').toString();
         }
-        if (v.getClass().isArray()) {
-            StringBuilder b = new StringBuilder("["); int n = java.lang.reflect.Array.getLength(v);
-            for (int i=0;i<n;i++) { if (i>0)b.append(','); b.append(value(java.lang.reflect.Array.get(v,i))); }
-            return b.append(']').toString();
-        }
+        if (v instanceof Object[] a) return arrayObjects(a);
+        if (v instanceof boolean[] a) return arrayBooleans(a);
+        if (v instanceof byte[] a) return arrayBytes(a);
+        if (v instanceof short[] a) return arrayShorts(a);
+        if (v instanceof int[] a) return arrayInts(a);
+        if (v instanceof long[] a) return arrayLongs(a);
+        if (v instanceof float[] a) return arrayFloats(a);
+        if (v instanceof double[] a) return arrayDoubles(a);
+        if (v instanceof char[] a) return arrayChars(a);
         return quote(String.valueOf(v));
     }
+    private static String arrayObjects(Object[] a) {
+        StringBuilder b = new StringBuilder("[");
+        for (int i=0;i<a.length;i++) { if (i>0)b.append(','); b.append(value(a[i])); }
+        return b.append(']').toString();
+    }
+    private static String arrayBooleans(boolean[] a) { StringBuilder b=new StringBuilder("["); for(int i=0;i<a.length;i++){if(i>0)b.append(',');b.append(a[i]);} return b.append(']').toString(); }
+    private static String arrayBytes(byte[] a) { StringBuilder b=new StringBuilder("["); for(int i=0;i<a.length;i++){if(i>0)b.append(',');b.append(a[i]);} return b.append(']').toString(); }
+    private static String arrayShorts(short[] a) { StringBuilder b=new StringBuilder("["); for(int i=0;i<a.length;i++){if(i>0)b.append(',');b.append(a[i]);} return b.append(']').toString(); }
+    private static String arrayInts(int[] a) { StringBuilder b=new StringBuilder("["); for(int i=0;i<a.length;i++){if(i>0)b.append(',');b.append(a[i]);} return b.append(']').toString(); }
+    private static String arrayLongs(long[] a) { StringBuilder b=new StringBuilder("["); for(int i=0;i<a.length;i++){if(i>0)b.append(',');b.append(a[i]);} return b.append(']').toString(); }
+    private static String arrayFloats(float[] a) { StringBuilder b=new StringBuilder("["); for(int i=0;i<a.length;i++){if(i>0)b.append(',');b.append(a[i]);} return b.append(']').toString(); }
+    private static String arrayDoubles(double[] a) { StringBuilder b=new StringBuilder("["); for(int i=0;i<a.length;i++){if(i>0)b.append(',');b.append(a[i]);} return b.append(']').toString(); }
+    private static String arrayChars(char[] a) { StringBuilder b=new StringBuilder("["); for(int i=0;i<a.length;i++){if(i>0)b.append(',');b.append(quote(String.valueOf(a[i])));} return b.append(']').toString(); }
+
 }

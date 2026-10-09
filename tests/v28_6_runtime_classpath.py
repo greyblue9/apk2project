@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 from __future__ import annotations
-import importlib.util, os, tempfile
+import importlib.util, sys, os, tempfile
 from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(ROOT))
 spec=importlib.util.spec_from_file_location('hybrid_apk_v286',ROOT/'hybrid_apk.py')
 h=importlib.util.module_from_spec(spec); spec.loader.exec_module(h)
 
@@ -23,11 +24,11 @@ with tempfile.TemporaryDirectory(prefix='v28.6-runtime-cp-') as td:
         return Result()
 
     h._run=fake_run
-    h.run_dex_helper(engine,[dexlib,guava],'probe-dexlib',capture=True)
+    h.run_dex_helper(engine,[dexlib,guava],'inventory','--apk','x.apk',capture=True)
     cmd,capture,check=seen[-1]
     assert cmd[:2]==['java','-cp']
     assert cmd[2]==os.pathsep.join(map(str,[engine,dexlib,guava]))
-    assert cmd[3:]==['apk2project.hybrid.DexHybridRebuilder','probe-dexlib']
+    assert cmd[3:]==['apk2project.hybrid.DexHybridRebuilder','inventory','--apk','x.apk']
     assert capture is True and check is True
 
     work=td/'work'; work.mkdir()
@@ -50,4 +51,4 @@ assert 'inv=inventory_apk(original_apk,engine,dexlib_cp,work)' in source
 
 print('PASS DexHybridRebuilder runtime classpath includes engine + complete dexlib bundle')
 print('PASS inventory uses the canonical runtime helper launcher')
-print('PASS probe/inventory/merge cannot independently drop dexlib from -cp')
+print('PASS inventory/merge cannot independently drop dexlib from -cp')

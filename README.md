@@ -1,17 +1,58 @@
 # Apk2Project
-Version 28.8 — An APK-to-project-editable-source decompiler and APK reassembler
 
-*Quick Usage:*
+**Version 29.0 — pinned toolchain, source-first hybrid rebuild, and DEX class-tree export**
 
-    python3 apk2project.py --install-tools --compile --keep-work --hybrid-shadow permissive --hybrid-obfuscated-binary --hybrid-binary-source-action move --binary-islands off --java-repair aggressive --java-repair-rounds 64 --rebuild-apk --hybrid-apk-sign debug  <original APK>
+Apk2Project reconstructs editable app-owned Java from an APK while keeping binary-owned/library code behind DEX-derived ABI facades. Its hybrid rebuild path recompiles only the reconstructed source-owned classes, lowers them back to the original raw DEX namespace/semantics, preserves the original binary resources and retained DEX code, then repacks and signs the APK.
 
+## Quick usage
 
-This will attempt to decompile your APK into a set of actual app-related source files (hiding all library and obfuscated classes behind a JAR), then (optionally after you make changes) attempt to recompile and relink the APK so that it is identical except for the app sources it produces (or that you add).
+```bash
+python3 apk2project.py \
+  --keep-work \
+  --hybrid-shadow permissive \
+  --hybrid-obfuscated-binary \
+  --hybrid-binary-source-action move \
+  --binary-islands off \
+  --java-repair aggressive \
+  --java-repair-rounds 64 \
+  --rebuild-apk \
+  --hybrid-apk-sign debug \
+  app.apk
+```
 
-You'll need to uninstall the original APK if you intend to install the edited final product.
+`--rebuild-apk` now implies `--compile`; callers no longer have to pre-create or point apk2project at replacement `.class` files. If the expected javac output is missing or older than its source, the hybrid rebuilder invokes the reconstructed project's JavaCompile task and reuses fresh output on subsequent runs.
 
-Special thanks to ChatGPT.
+To emit a complete original-DEX superclass forest (plus machine-readable JSON), add:
 
+```bash
+--dump-class-tree
+```
+
+The files are written to `analysis/dex-class-tree.txt` and `analysis/dex-class-tree.json`.
+
+## v29.0 — one owned, pinned toolchain
+
+The main decompiler/runtime tools are now selected by apk2project rather than injected piecemeal by callers:
+
+- Apktool **3.0.3**
+- JADX **1.5.6**
+- `com.android.tools.smali:smali-dexlib2` **3.0.10** plus its pinned runtime bundle
+
+They live under `--tools-dir` (a cache-root choice, not an individual-jar override). Apk2Project no longer selects system Apktool/JADX, searches Gradle/Maven caches for dexlib2, consumes `DEXLIB_JAR`, accepts a dexlib jar override, or probes multiple shaded dexlib namespaces. The resolved versions and paths are recorded in `analysis/toolchain.json`.
+
+The runtime DEX helper continues to use the public `com.android.tools.smali.dexlib2` API directly. The remaining Java array serialization reflection was also removed from the javac helper, and JADX capability probing was replaced with the known surface of the pinned JADX release. See `more-docs/V29_PINNED_TOOLCHAIN.md`.
+
+## v29.0 — source-first runtime boundary
+
+The hybrid API treats Java source as the input. Existing current javac output is reused; otherwise apk2project compiles it on demand. This preserves the validated source/binary ownership boundary while removing `.class` preparation as a user-facing prerequisite.
+
+The repository is source-only for the Java helpers: precompiled `java_engine/classes` and `javac_engine/build` artifacts are not shipped and are ignored by Git. Helper bytecode is compiled against the local JDK when the relevant path is first needed.
+
+The class-tree dumper is dependency-free and reads `class_defs` directly from the APK DEX universe. The printable tree follows superclass edges; interface relationships and per-class DEX/member metadata are included on each node, and every class definition is emitted exactly once.
+
+Historical v28 milestones follow.
+
+# v28.8 — verbose merge diagnostics
 
 v28.8 retains the v28.7 runtime semantics and adds a detailed phase-by-phase trace around `apk2project.hybrid.DexHybridRebuilder.merge()`. It reports original/replacement class universes, constructor-bridge discovery/lowering, exact removal ownership, touched/byte-copied DEX files, hashes, appended multidex placement, ABI/linkage gates, and expanded class-hierarchy context for missing methods/fields. Verbosity is on by default and can be disabled with `APK2PROJECT_DEX_MERGE_VERBOSE=0`. See `V28_8_VERBOSE_MERGE.md`.
 
@@ -47,14 +88,6 @@ Changes from v28.4:
   method types, enum/field/method encoded values, and nested annotation/array values are
   included in the runtime-reference gate.
 
-Explicit override, if desired:
-
-```bash
---dexlib-jar /path/to/smali-dexlib2-3.0.10.jar
-```
-
-A directory may also be supplied; this is useful when the dexlib jar and its Guava/jsr305
-runtime dependencies are kept together.
 
 ---
 
@@ -170,11 +203,6 @@ python apk2project.py app.apk \
   --hybrid-apk-sign debug
 ```
 
-If you want to provide the standalone dexlib2 distribution explicitly, add:
-
-```bash
---dexlib-jar /path/to/smali-dexlib2-3.0.10.jar
-```
 
 Runtime diagnostics are written under `analysis/hybrid-apk/`, including the replacement plan,
 dealias map/report, raw ABI report, D8 log, dex merge/linkage report, zipalign command, signature

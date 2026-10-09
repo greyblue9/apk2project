@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""v28 hybrid APK runtime rebuilder.
+"""v29 hybrid APK runtime rebuilder.
 
 Preserves the original APK resource/manifest/native-file payload, replaces only
 validated source-owned DEX classes, and uses the official standalone Google
@@ -8,47 +8,18 @@ and compiled only after the validated app javac boundary succeeds. Untouched DEX
 entries are byte-copied.
 """
 from __future__ import annotations
-import argparse, hashlib, json, os, re, shutil, subprocess, tempfile, zipfile, urllib.request
+import argparse, hashlib, json, os, re, shutil, subprocess, tempfile, zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
 DEX_RE = re.compile(r"^classes(?:\d+)?\.dex$")
 SIG_RE = re.compile(r"^META-INF/[^/]+\.(?:RSA|DSA|EC|SF)$", re.I)
-DEXLIB_PREFIX = "com/android/tools/smali/dexlib2"
-DEXLIB_VERSION = "3.0.10"
-DEXLIB_REQUIRED_SUFFIXES = (
-    "Opcodes.class",
-    "dexbacked/DexBackedDexFile.class",
-    "iface/ClassDef.class",
-    "iface/DexFile.class",
-    "writer/pool/DexPool.class",
-)
 
-# Official Google smali artifact plus runtime dependencies.  Keep this independent
-# of Apktool's fat/shaded jar: Apktool is free to shrink or alter its private copy.
-DEXLIB_BUNDLE = (
-    (f"smali-dexlib2-{DEXLIB_VERSION}.jar",
-     f"https://dl.google.com/dl/android/maven2/com/android/tools/smali/smali-dexlib2/{DEXLIB_VERSION}/smali-dexlib2-{DEXLIB_VERSION}.jar"),
-    ("guava-31.1-android.jar",
-     "https://repo1.maven.org/maven2/com/google/guava/guava/31.1-android/guava-31.1-android.jar"),
-    ("failureaccess-1.0.1.jar",
-     "https://repo1.maven.org/maven2/com/google/guava/failureaccess/1.0.1/failureaccess-1.0.1.jar"),
-    ("listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar",
-     "https://repo1.maven.org/maven2/com/google/guava/listenablefuture/9999.0-empty-to-avoid-conflict-with-guava/listenablefuture-9999.0-empty-to-avoid-conflict-with-guava.jar"),
-    ("jsr305-3.0.2.jar",
-     "https://repo1.maven.org/maven2/com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.jar"),
-    ("checker-qual-3.12.0.jar",
-     "https://repo1.maven.org/maven2/org/checkerframework/checker-qual/3.12.0/checker-qual-3.12.0.jar"),
-    ("error_prone_annotations-2.11.0.jar",
-     "https://repo1.maven.org/maven2/com/google/errorprone/error_prone_annotations/2.11.0/error_prone_annotations-2.11.0.jar"),
-    ("j2objc-annotations-1.3.jar",
-     "https://repo1.maven.org/maven2/com/google/j2objc/j2objc-annotations/1.3/j2objc-annotations-1.3.jar"),
-)
+from toolchain import DEXLIB_VERSION, ensure_dexlib_classpath, tool_versions
 
 JAVA_RUNTIME_EXPORTS = [
     '--add-exports', 'java.base/jdk.internal.org.objectweb.asm=ALL-UNNAMED',
 ]
-
 
 
 def _run(cmd, *, cwd=None, capture=False, check=True):
@@ -67,154 +38,18 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def _jar_dexlib_prefix(path: Path) -> str|None:
-    """Return the dexlib namespace only when the jar exposes the *complete* API.
+def find_dexlib_classpath(tools_dir: Path|None=None) -> list[Path]:
+    """Return apk2project's pinned standalone smali-dexlib2 runtime.
 
-    Apktool 3.x is a fat/shaded application jar, not a supported dexlib2 library
-    distribution.  Some releases contain DexBackedDexFile/ClassDef but omit
-    DexFile/DexPool or alter APIs.  A marker-only probe therefore gives false
-    positives.
-    """
-    try:
-        with zipfile.ZipFile(path) as z:
-            names=set(z.namelist())
-    except Exception:
-        return None
-    if all(f"{DEXLIB_PREFIX}/{suffix}" in names for suffix in DEXLIB_REQUIRED_SUFFIXES):
-        return DEXLIB_PREFIX.replace('/', '.')
-    return None
-
-
-def _valid_jar(path: Path) -> bool:
-    try:
-        with zipfile.ZipFile(path) as z:
-            return any(not x.endswith('/') for x in z.namelist())
-    except Exception:
-        return False
-
-
-def _download_atomic(url: str, dest: Path) -> None:
-    dest.parent.mkdir(parents=True,exist_ok=True)
-    tmp=dest.with_name(dest.name+'.part')
-    req=urllib.request.Request(url,headers={'User-Agent':'apk2project-v28.8','Accept':'*/*'})
-    try:
-        with urllib.request.urlopen(req,timeout=60) as r, tmp.open('wb') as out:
-            shutil.copyfileobj(r,out)
-        if not _valid_jar(tmp):
-            raise RuntimeError(f'downloaded file is not a valid jar: {url}')
-        tmp.replace(dest)
-    finally:
-        try:
-            if tmp.exists(): tmp.unlink()
-        except Exception:
-            pass
-
-
-def _standalone_bundle(tools_dir: Path) -> list[Path]:
-    bundle=Path(tools_dir).expanduser()/f'dexlib2-{DEXLIB_VERSION}'
-    bundle.mkdir(parents=True,exist_ok=True)
-    result=[]
-    for filename,url in DEXLIB_BUNDLE:
-        p=bundle/filename
-        if not _valid_jar(p):
-            print(f'[*] v28: downloading standalone dexlib dependency {filename}')
-            _download_atomic(url,p)
-        result.append(p)
-    primary=result[0]
-    if _jar_dexlib_prefix(primary) is None:
-        raise RuntimeError(f'standalone dexlib jar is incomplete or unexpected: {primary}')
-    return result
-
-
-def _dependency_jars_near(primary: Path) -> list[Path]:
-    """Return sibling jars that may satisfy smali-dexlib2 runtime dependencies."""
-    dep_prefixes=(
-        'guava-','failureaccess-','listenablefuture-','jsr305-',
-        'checker-qual-','error_prone_annotations-','j2objc-annotations-'
-    )
-    return sorted(
-        x.resolve() for x in primary.parent.glob('*.jar')
-        if x.resolve()!=primary.resolve() and x.name.startswith(dep_prefixes)
-    )
-
-
-def _gradle_cached_dependency_jars(home: Path) -> list[Path]:
-    base=home/'.gradle/caches/modules-2/files-2.1'
-    coords=(
-        ('com.google.guava','guava'),
-        ('com.google.guava','failureaccess'),
-        ('com.google.guava','listenablefuture'),
-        ('com.google.code.findbugs','jsr305'),
-        ('org.checkerframework','checker-qual'),
-        ('com.google.errorprone','error_prone_annotations'),
-        ('com.google.j2objc','j2objc-annotations'),
-    )
-    out=[]
-    for group,artifact in coords:
-        root=base/group/artifact
-        if not root.is_dir():
-            continue
-        jars=sorted(root.glob('*/*/*.jar'), key=lambda x:x.stat().st_mtime, reverse=True)
-        if jars:
-            out.append(jars[0].resolve())
-    return out
-
-
-def find_dexlib_classpath(explicit: Path|None=None, tools_dir: Path|None=None) -> list[Path]:
-    """Resolve the official Google smali-dexlib2 runtime classpath.
-
-    v28.8 keeps the v28.5 direct-dexlib architecture and v28.7 constructor lowering and stops adapting Apktool's private/shaded dexlib copy and
-    stops carrying an org.jf reflection compatibility layer.  The runtime helper
-    directly imports the public com.android.tools.smali API.  If no complete
-    standalone distribution is already available, apk2project bootstraps its own
-    pinned bundle under the tools directory.
+    v29 deliberately has no per-jar override, environment-variable override,
+    Gradle-cache search, Maven-cache search, or Apktool shading fallback.  The
+    runtime helper is compiled and executed against the exact bundle owned by
+    apk2project under --tools-dir.
     """
     tools_dir=Path(tools_dir or (Path.home()/'.local/share/apk2project/tools')).expanduser()
-    candidates=[]
-    explicit_dir=None
-    if explicit:
-        e=Path(explicit).expanduser()
-        if e.is_dir():
-            explicit_dir=e.resolve()
-            candidates += sorted(e.glob('smali-dexlib2*.jar'), reverse=True)
-            candidates += sorted(e.glob('*dexlib2*.jar'), reverse=True)
-        else:
-            candidates.append(e)
-    candidates += sorted(tools_dir.glob('dexlib2-*/*smali-dexlib2*.jar'), reverse=True)
-    candidates += sorted(tools_dir.glob('smali-dexlib2*.jar'), reverse=True)
-    env=os.environ.get('DEXLIB_JAR')
-    if env:
-        candidates.append(Path(env).expanduser())
-    home=Path.home()
-    candidates += sorted(
-        (home/'.gradle/caches/modules-2/files-2.1/com.android.tools.smali/smali-dexlib2').glob('*/*/*.jar'),
-        reverse=True,
-    )
-    candidates += sorted(
-        (home/'.m2/repository/com/android/tools/smali/smali-dexlib2').glob('*/*.jar'),
-        reverse=True,
-    )
-
-    seen=set()
-    for p in candidates:
-        try: p=p.resolve()
-        except Exception: pass
-        if p in seen or not p.is_file():
-            continue
-        seen.add(p)
-        ns=_jar_dexlib_prefix(p)
-        if not ns:
-            continue
-        deps=_dependency_jars_near(p)
-        # Gradle's module cache stores each artifact in a different directory.
-        # Add cached transitive jars opportunistically; the Java probe is the
-        # final authority on whether the resulting classpath is actually usable.
-        deps += [x for x in _gradle_cached_dependency_jars(home) if x not in deps]
-        cp=[p,*deps]
-        print(f'[*] v28.8: using standalone dexlib2 from {p} ({ns})')
-        return cp
-
-    return _standalone_bundle(tools_dir)
+    cp=ensure_dexlib_classpath(tools_dir)
+    print(f'[*] v29: using pinned smali-dexlib2 {DEXLIB_VERSION} from {cp[0]}')
+    return cp
 
 
 def _engine_exports() -> list[str]:
@@ -238,13 +73,13 @@ def ensure_core_engine(script_dir: Path, project: Path) -> Path:
     marker=out/'apk2project/hybrid/HybridCompiler.class'
     javac=shutil.which('javac')
     if not javac:
-        raise RuntimeError('javac is required to compile the v28.8 Java helper')
+        raise RuntimeError('javac is required to compile the v29 Java helper')
     out.mkdir(parents=True,exist_ok=True)
     newest=max(x.stat().st_mtime for x in core_java)
     if not marker.exists() or marker.stat().st_mtime<newest:
         _run([javac,*_engine_exports(),'-d',out,*core_java])
     if not marker.exists():
-        raise RuntimeError('v28.8 core Java helper did not compile')
+        raise RuntimeError('v29 core Java helper did not compile')
     return out
 
 
@@ -267,7 +102,7 @@ def ensure_engine(script_dir: Path, project: Path, dexlib_cp: list[Path]) -> Pat
     if not runtime_marker.exists() or runtime_marker.stat().st_mtime<newest:
         _run([javac,*_engine_exports(),'-cp',java_cp(out,*dexlib_cp),'-d',out,runtime_src])
     if not runtime_marker.exists():
-        raise RuntimeError('v28.8 runtime DEX helper did not compile')
+        raise RuntimeError('v29 runtime DEX helper did not compile')
     return out
 
 
@@ -281,7 +116,7 @@ def run_dex_helper(engine: Path, dexlib_cp: list[Path], *args, capture: bool=Fal
     DexHybridRebuilder directly links against standalone smali-dexlib2, so *every*
     subcommand must run with both the compiled engine directory and the full
     dexlib runtime bundle. Centralizing the launch here prevents individual
-    inventory/merge/probe call sites from accidentally dropping those jars.
+    inventory/merge call sites from accidentally dropping those jars.
     """
     if not dexlib_cp:
         raise RuntimeError('DexHybridRebuilder requires a non-empty standalone dexlib2 classpath')
@@ -305,7 +140,7 @@ def _source_fqcn(rel: str) -> str:
 def plan_replacements(project: Path, inventory: dict) -> dict:
     project=Path(project)
     own_path=project/'analysis/hybrid-source-ownership.json'
-    if not own_path.is_file(): raise FileNotFoundError(f"missing {own_path}; v28 requires a validated hybrid-shadow build")
+    if not own_path.is_file(): raise FileNotFoundError(f"missing {own_path}; v29 requires a validated hybrid-shadow build")
     own=json.loads(own_path.read_text())
     original={d for vals in inventory.get('dex',{}).values() for d in vals}
     src_to_raw=own.get('source_to_raw') or {}
@@ -472,21 +307,108 @@ def build_raw_abi(engine: Path, original_apk: Path, output_classes: list[str], w
     return jar,json.loads(report.read_text())
 
 
-def find_javac_classes(project: Path) -> Path:
+def _planned_top_level_classes(plan: dict|None) -> list[Path]:
+    if not plan:
+        return []
+    return [Path(*ent['fqcn'].split('.')).with_suffix('.class') for ent in (plan.get('runtime') or [])]
+
+
+def find_javac_classes(project: Path, plan: dict|None=None) -> Path:
+    """Locate javac output, preferring a class tree containing the whole replacement plan."""
     preferred=[
         project/'app/build/intermediates/javac/debug/compileDebugJavaWithJavac/classes',
         project/'app/build/intermediates/javac/debug/classes',
     ]
+    candidates=[]
+    seen=set()
     for p in preferred:
-        if p.is_dir() and any(p.rglob('*.class')): return p
-    roots=[]
+        if p.is_dir() and any(p.rglob('*.class')):
+            rp=p.resolve()
+            if rp not in seen: candidates.append(p); seen.add(rp)
     base=project/'app/build/intermediates'
     if base.exists():
         for p in base.rglob('classes'):
-            if p.is_dir() and 'javac' in p.parts and any(p.rglob('*.class')): roots.append(p)
-    if not roots: raise FileNotFoundError('could not locate compileDebugJavaWithJavac class output; run a successful --compile first')
-    roots.sort(key=lambda p:p.stat().st_mtime, reverse=True)
-    return roots[0]
+            if p.is_dir() and 'javac' in p.parts and any(p.rglob('*.class')):
+                rp=p.resolve()
+                if rp not in seen: candidates.append(p); seen.add(rp)
+    if not candidates:
+        raise FileNotFoundError('could not locate compileDebugJavaWithJavac class output')
+
+    needed=_planned_top_level_classes(plan)
+    if needed:
+        complete=[p for p in candidates if all((p/rel).is_file() for rel in needed)]
+        if complete:
+            candidates=complete
+    candidates.sort(key=lambda p:p.stat().st_mtime, reverse=True)
+    return candidates[0]
+
+
+def _replacement_classes_current(project: Path, class_root: Path, plan: dict) -> bool:
+    """True when every planned owner has a compiled top-level class newer than source."""
+    java_root=project/'app/src/main/java'
+    for ent in plan.get('runtime') or []:
+        rel=Path(*ent['fqcn'].split('.'))
+        cls=class_root/rel.with_suffix('.class')
+        if not cls.is_file():
+            return False
+        src=java_root/Path(ent['source'])
+        if src.is_file() and src.stat().st_mtime > cls.stat().st_mtime:
+            return False
+    return True
+
+
+def _gradle_compile_command(project: Path) -> list[str]|None:
+    """Return a compile command for an already reconstructed apk2project tree."""
+    wrapper=project/'build-termux.sh'
+    if wrapper.is_file():
+        lead=[str(wrapper)] if os.access(wrapper,os.X_OK) else [shutil.which('bash') or 'bash',str(wrapper)]
+        return [*lead,'--console=plain','--warning-mode=none',':app:compileDebugJavaWithJavac']
+    gradlew=project/'gradlew'
+    if gradlew.is_file():
+        lead=[str(gradlew)] if os.access(gradlew,os.X_OK) else [shutil.which('sh') or 'sh',str(gradlew)]
+        return [*lead,'--no-daemon','--console=plain','--warning-mode=none',':app:compileDebugJavaWithJavac']
+    gradle=shutil.which('gradle')
+    if gradle:
+        return [gradle,'--no-daemon','--console=plain','--warning-mode=none',':app:compileDebugJavaWithJavac']
+    return None
+
+
+def ensure_javac_classes(project: Path, plan: dict, work: Path) -> Path:
+    """Locate replacement .class output, compiling current Java source when needed.
+
+    The hybrid runtime API is source-first: callers no longer have to pre-build or
+    pass class files. Existing known-good javac output is reused when all planned
+    runtime owners are present and not older than their source files. Otherwise
+    apk2project invokes the reconstructed project's JavaCompile task and then
+    locates the resulting class tree itself.
+    """
+    project=Path(project)
+    existing=None
+    try:
+        existing=find_javac_classes(project,plan)
+    except FileNotFoundError:
+        pass
+    if existing is not None and _replacement_classes_current(project,existing,plan):
+        return existing
+
+    cmd=_gradle_compile_command(project)
+    if cmd is None:
+        raise FileNotFoundError(
+            'compiled replacement classes are missing/stale and no Gradle launcher is available; '
+            'apk2project could not compile them on demand'
+        )
+    print('[*] v29: replacement .class output missing/stale; compiling app Java on demand')
+    proc=_run(cmd,cwd=project,capture=True,check=False)
+    log=work/'on-demand-javac.log'
+    log.write_text(proc.stdout or '')
+    if proc.stdout:
+        print(proc.stdout,end='' if proc.stdout.endswith('\n') else '\n')
+    if proc.returncode:
+        raise RuntimeError(f'on-demand compileDebugJavaWithJavac failed; see {log}')
+    root=find_javac_classes(project,plan)
+    if not _replacement_classes_current(project,root,plan):
+        raise RuntimeError('Gradle javac succeeded but one or more planned runtime owner .class files are still missing/stale')
+    return root
 
 
 def collect_replacement_classes(class_root: Path, plan: dict, out: Path) -> list[Path]:
@@ -541,7 +463,7 @@ def validate_r_constants(project: Path, class_root: Path, work: Path) -> dict:
         except ValueError: continue
 
     javap=shutil.which('javap')
-    if not javap: raise RuntimeError('javap is required for v28 resource-ID verification')
+    if not javap: raise RuntimeError('javap is required for hybrid resource-ID verification')
     checked=0; mismatches=[]; missing_r=[]; observed={}
     const_re=re.compile(r'^\s*public\s+static\s+final\s+int\s+([^\s=;]+)\s*=\s*(-?(?:0x[0-9a-fA-F]+|\d+));\s*$')
     for rel in r_sources:
@@ -659,7 +581,7 @@ def merge_dex(original_apk: Path, engine: Path, dexlib_cp: list[Path], replaceme
             '--out-dir',out_dir,'--report',report,'--api',str(api),'--min-api',str(min_api),capture=True,check=False)
     merge_log=work/'dex-merge.log'
     merge_log.write_text(p.stdout or '')
-    # v28.8: surface the Java merge trace in the main apk2project output as well
+    # Surface the Java merge trace in the main apk2project output as well.
     # as preserving it verbatim on disk.  On failure do not duplicate the entire
     # trace inside the Python exception; the phase-tagged Java output immediately
     # above plus the persistent log are the useful diagnostics.
@@ -750,24 +672,22 @@ def sign_debug(project: Path, unsigned: Path, work: Path) -> Path:
     return signed
 
 
-def rebuild(original_apk: Path, project: Path, *, dexlib_jar: Path|None=None,
+def rebuild(original_apk: Path, project: Path, *,
             tools_dir: Path|None=None, output: Path|None=None, sign: str='debug') -> dict:
     original_apk=Path(original_apk).resolve(); project=Path(project).resolve()
     work=project/'analysis/hybrid-apk'; work.mkdir(parents=True,exist_ok=True)
     script_dir=Path(__file__).resolve().parent
     # Runtime tooling is resolved only now: apk2project.py calls rebuild() after
     # the app's validated source-owned javac has succeeded.
-    dexlib_cp=find_dexlib_classpath(dexlib_jar,tools_dir)
+    dexlib_cp=find_dexlib_classpath(tools_dir)
     engine=ensure_engine(script_dir,project,dexlib_cp)
-    probe=run_dex_helper(engine,dexlib_cp,'probe-dexlib',capture=True)
-    (work/'dexlib-probe.log').write_text(probe.stdout or '')
     inv=inventory_apk(original_apk,engine,dexlib_cp,work)
     plan=plan_replacements(project,inv)
     (work/'replacement-plan.json').write_text(json.dumps(plan,indent=2,sort_keys=True))
     own=json.loads((project/'analysis/hybrid-source-ownership.json').read_text())
     sdk=sdk_facts(project); compile_api=int(sdk['compile_api']); min_api=int(sdk['min_api'])
     (work/'sdk-facts.json').write_text(json.dumps(sdk,indent=2,sort_keys=True))
-    class_root=find_javac_classes(project)
+    class_root=ensure_javac_classes(project,plan,work)
     resource_ids=validate_r_constants(project,class_root,work)
     class_input=work/'replacement-classes'
     classes=collect_replacement_classes(class_root,plan,class_input)
@@ -784,11 +704,11 @@ def rebuild(original_apk: Path, project: Path, *, dexlib_jar: Path|None=None,
     if output is None: output=project/'app/build/outputs/apk/hybrid'/f'{original_apk.stem}-hybrid-unsigned.apk'
     unsigned=Path(output).resolve()
     package_report=repack_apk(original_apk,merged,unsigned)
-    result={'version':'v28.8','original_apk':str(original_apk),'project':str(project),'plan':plan,
+    result={'version':'v29.0','original_apk':str(original_apk),'project':str(project),'plan':plan,
             'compiled_class_root':str(class_root),'resource_ids':resource_ids,'replacement_class_files':[str(x.relative_to(class_input)) for x in classes],
             'sdk':sdk,'runtime_dealias_map':dealias_map_report,'runtime_dealias':dealias_report,'raw_abi':raw_abi_report,
             'raw_replacement_class_files':[str(x.relative_to(raw_classes)) for x in raw_inputs],
-            'dexlib_classpath':[str(x) for x in dexlib_cp],'dex_merge':merge_report,'package':package_report}
+            'tool_versions':tool_versions(),'dexlib_classpath':[str(x) for x in dexlib_cp],'dex_merge':merge_report,'package':package_report}
     if sign=='debug':
         signed=sign_debug(project,unsigned,work);result['signed_apk']=str(signed);result['signed_sha256']=_sha256(signed)
     (work/'hybrid-apk-report.json').write_text(json.dumps(result,indent=2,sort_keys=True))
@@ -796,13 +716,12 @@ def rebuild(original_apk: Path, project: Path, *, dexlib_jar: Path|None=None,
 
 
 def main():
-    ap=argparse.ArgumentParser(description='v28.8 preserve-original-DEX hybrid APK rebuilder')
+    ap=argparse.ArgumentParser(description='v29 preserve-original-DEX hybrid APK rebuilder')
     ap.add_argument('apk',type=Path); ap.add_argument('project',type=Path)
-    ap.add_argument('--dexlib-jar',type=Path,default=None,help='official standalone com.android.tools.smali smali-dexlib2 jar or directory containing its runtime dependencies')
     ap.add_argument('--tools-dir',type=Path,default=Path.home()/'.local/share/apk2project/tools')
     ap.add_argument('-o','--output',type=Path,default=None)
     ap.add_argument('--sign',choices=('off','debug'),default='debug')
-    z=ap.parse_args();r=rebuild(z.apk,z.project,dexlib_jar=z.dexlib_jar,tools_dir=z.tools_dir,output=z.output,sign=z.sign)
+    z=ap.parse_args();r=rebuild(z.apk,z.project,tools_dir=z.tools_dir,output=z.output,sign=z.sign)
     print(json.dumps(r,indent=2,sort_keys=True))
     print(r.get('signed_apk') or r['package']['output'])
 

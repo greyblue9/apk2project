@@ -1,0 +1,91 @@
+apk2project v29.0 validation summary
+==================================
+
+Basis
+-----
+Source tree: user-provided apk2project.zip, modified in place as the v29 working tree.
+The v28.8 hybrid architecture/constructor lowering/linkage gates were retained.
+
+Python/static validation
+------------------------
+PASS python -m py_compile:
+  apk2project.py
+  hybrid_apk.py
+  toolchain.py
+  source_repair.py
+  binary_islands.py
+
+PASS direct-source audit:
+  no --dexlib-jar option
+  no --install-tools option
+  no DEXLIB_JAR runtime override
+  no DEXLIB_CP Java-engine build override
+  no system Apktool/JADX selection
+  no Gradle/Maven dexlib discovery in hybrid_apk.py
+  no dexlib probe-dexlib compatibility command
+  no Class.forName / Proxy adapter in DexHybridRebuilder
+  no java.lang.reflect array serialization in javac Json helper
+
+Java helper validation
+----------------------
+PASS javac_engine/build.sh with the required JDK compiler exports.
+PASS java_engine/build.sh/core compilation during regression runs.
+PASS hybrid engine compiles from source on demand into project analysis output.
+
+Regression suites run successfully
+----------------------------------
+PASS tests/binary_island_cases.py
+PASS tests/hybrid_gradle_classpath_case.py
+PASS tests/hybrid_shadow_cases.py
+PASS tests/hybrid_transactional_shadow.py
+PASS tests/obfuscated_binary_ownership.py
+PASS tests/regression_cases.py
+PASS tests/resume_safety.py
+PASS tests/search_strategy.py
+PASS tests/smoke_source_repair.py
+PASS tests/v24_frontier_oracle_cases.py
+PASS tests/v27_2_ssa_clinit.py
+PASS tests/v27_3_library_boundary.py
+PASS tests/v27_4_1_gradle_escape.py
+PASS tests/v27_4_realapk_boundary.py
+PASS tests/v27_5_synthetic_visibility.py
+PASS tests/v28_4_dexlib_boundary.py
+PASS tests/v28_5_direct_dexlib_boundary.py
+PASS tests/v28_6_runtime_classpath.py
+PASS tests/v28_7_dex_constructor_bridges.py
+PASS tests/v28_8_verbose_merge.py
+PASS tests/v28_hybrid_apk.py
+PASS tests/v29_toolchain_and_tree.py
+
+New v29 behavior exercised
+--------------------------
+PASS missing replacement class output is compiled on demand.
+PASS fresh replacement class output is reused without recompilation.
+PASS modifying source makes class output stale and forces recompilation.
+PASS class-root selection is replacement-plan aware.
+PASS --rebuild-apk implies --compile in the main CLI.
+PASS pinned tool policy and direct dexlib runtime boundary are regression-checked.
+PASS DEX class-tree renderer emits text and JSON hierarchy views.
+
+Real APK class-tree fixture
+---------------------------
+Input: previously retained TopActivity APK test fixture.
+PASS original DEX parsed directly through DexReader.
+PASS 1,536 class definitions emitted.
+PASS 1,125 superclass-tree roots (external superclasses are intentionally roots).
+PASS text dump contains 1,539 lines including headers.
+PASS JSON reports class_count=1536.
+
+Packaging policy
+----------------
+The release archive intentionally excludes generated/precompiled .class output,
+java_engine/classes/, javac_engine/build/, Python __pycache__, and *.pyc. These
+are compiled/generated on demand and are covered by .gitignore.
+
+Not claimed by this environment
+-------------------------------
+A fresh full v29 APK -> reconstructed project -> D8/dexlib2 -> signed APK run was
+not repeated here because the complete Android SDK/pinned-download runtime from
+the user's Termux environment is not present in this sandbox. The preceding
+v28.8 build was user-verified to install and launch; v29 retains those runtime
+semantics and the affected regression gates pass here.

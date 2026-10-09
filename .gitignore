@@ -1,0 +1,10 @@
+# apk2project helper bytecode is compiled from source on demand.
+java_engine/classes/
+javac_engine/build/
+
+# Python runtime artifacts
+__pycache__/
+*.py[cod]
+
+# Editor/OS noise
+.DS_Store

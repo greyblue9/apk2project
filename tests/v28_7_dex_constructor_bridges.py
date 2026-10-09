@@ -18,9 +18,9 @@ assert '!declaresConstructor(allocatedClass,d)' in src
 assert 'ImmutableInstruction35c' in src and 'ImmutableInstruction3rc' in src
 assert 'new ImmutableMethodReference(target,"<init>"' in src
 assert 'constructor_bridge_rewrites' in src
-assert 'v28.7' in hybrid
+assert "'v29.0'" in hybrid
 
 print('PASS original DEX constructor-bypass patterns are discovered from executable code')
 print('PASS bridge rules require direct-super ownership and absent allocated-class ctor')
 print('PASS D8 invoke-direct and invoke-direct/range references are lowered before linkage validation')
-print('PASS v28.7 reports constructor bridge rewrites')
+print('PASS v29 retains constructor bridge rewrites')

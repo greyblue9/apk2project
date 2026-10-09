@@ -46,7 +46,7 @@ final class DexReader {
         try (ZipFile zf = new ZipFile(apk.toFile())) {
             List<? extends ZipEntry> dexEntries = Collections.list(zf.entries()).stream()
                     .filter(e -> e.getName().matches("classes(?:\\d+)?\\.dex"))
-                    .sorted(Comparator.comparing(ZipEntry::getName)).toList();
+                    .sorted(DexReader::compareDexEntries).toList();
             for (ZipEntry ze : dexEntries) {
                 byte[] data;
                 try (InputStream in = zf.getInputStream(ze)) { data = in.readAllBytes(); }
@@ -54,6 +54,19 @@ final class DexReader {
             }
         }
         return out;
+    }
+
+    private static int compareDexEntries(ZipEntry a, ZipEntry b) {
+        return Integer.compare(dexEntryNumber(a.getName()), dexEntryNumber(b.getName()));
+    }
+
+    static int dexEntryNumber(String name) {
+        if ("classes.dex".equals(name)) return 1;
+        if (name != null && name.startsWith("classes") && name.endsWith(".dex")) {
+            String n=name.substring(7,name.length()-4);
+            try { return Integer.parseInt(n); } catch (NumberFormatException ignored) {}
+        }
+        return Integer.MAX_VALUE;
     }
 
     private static void readDex(byte[] b, String entry, Map<String, Clazz> out) throws IOException {

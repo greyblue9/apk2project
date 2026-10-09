@@ -75,21 +75,14 @@ def main():
       assert 'META-INF/OLD.SF' not in b.namelist() and 'META-INF/OLD.RSA' not in b.namelist()
     print('PASS APK repack preserves manifest/resources/assets/native payload and drops obsolete signatures')
 
-    # v28.4 must reject the exact trap seen in Apktool 3: a fat jar can expose
-    # DexBackedDexFile/ClassDef while omitting DexFile/DexPool or changing APIs.
-    incomplete=t/'apktool.jar'
-    with zipfile.ZipFile(incomplete,'w') as z:
-      for x in ('Opcodes.class','dexbacked/DexBackedDexFile.class','iface/ClassDef.class'):
-        z.writestr('com/android/tools/smali/dexlib2/'+x,b'x')
-    assert hybrid_apk._jar_dexlib_prefix(incomplete) is None
-    complete=t/'smali-dexlib2-3.0.10.jar'
-    with zipfile.ZipFile(complete,'w') as z:
-      for x in hybrid_apk.DEXLIB_REQUIRED_SUFFIXES:
-        z.writestr('com/android/tools/smali/dexlib2/'+x,b'x')
-    assert hybrid_apk._jar_dexlib_prefix(complete)=='com.android.tools.smali.dexlib2'
-    cp=hybrid_apk.find_dexlib_classpath(complete,t)
-    assert cp[0]==complete.resolve() and incomplete.resolve() not in cp,cp
-    print('PASS complete dexlib API gate rejects partial Apktool shading')
+    # v29 keeps the direct public dexlib boundary but owns the exact pinned bundle.
+    # There is no user-supplied jar, Apktool shading fallback, or Gradle/Maven cache search.
+    hybrid_src=(ROOT/'hybrid_apk.py').read_text()
+    tool_src=(ROOT/'toolchain.py').read_text()
+    assert '--dexlib-jar' not in hybrid_src
+    assert 'DEXLIB_JAR' not in hybrid_src and '.gradle/caches' not in hybrid_src
+    assert 'DEXLIB_BUNDLE' in tool_src and 'smali-dexlib2' in tool_src
+    print('PASS hybrid runtime uses apk2project-owned pinned dexlib bundle with no per-jar override')
 
     # Runtime dealiasing: javac-facing class/member aliases must become exact raw
     # DEX names before D8.  Include an app-owned method alias from JOBF as well as
